@@ -16,25 +16,49 @@ class DecisionTree:
         self.num_features = len(self.features)
 
         concat_data = pd.concat([Y, X], axis=1)
-        self.pick_attribute(concat_data)
+        self.class_count_dictionary = {i: {} for i in self.classes}
+        for i in self.classes:
+            self.class_count_dictionary[i].update({'Count': len(concat_data.loc[concat_data[self.Y_name] == i])})
+            self.class_count_dictionary[i].update({'Percent': (self.class_count_dictionary[i]['Count'] / len(concat_data))})
+
+        best_feature = self.pick_attribute(concat_data)
 
     def pick_attribute(self, input_data):
-        
+
         feature_results = {}
         for i in self.features:
             feature_categories = np.unique(input_data[i])
-            
+            total_count = len(input_data)
+
+            remainder = 0
             subset_dictionary = {}
-            class_count_dictionary = {}
+            subset_count_dictionary = {}
             for j in feature_categories:
                 subset_dictionary.update({j: input_data.loc[input_data[i] == j]})
-                class_count_dictionary.update({j: {}})
+                subset_count_dictionary.update({j: {}})
+                
+                subset_count_dictionary[j].update({'Total': len(subset_dictionary[j])})
+                cardinality = ( subset_count_dictionary[j]['Total'] / total_count )
+                sub_remainder = 0
                 for k in self.classes:
-                    class_count_dictionary[j].update({k: len(subset_dictionary[j].loc[subset_dictionary[j][self.Y_name] == k])})
-                class_count_dictionary[j].update({'Total': len(subset_dictionary[j])})
+                    subset_count_dictionary[j].update({k: len(subset_dictionary[j].loc[subset_dictionary[j][self.Y_name] == k])})
+                    sub_remainder += self.cross_entropy(subset_count_dictionary[j][k] / subset_count_dictionary[j]['Total'])
+                remainder += (cardinality * sub_remainder)
+            
+            h_prior = 0
+            for k in self.classes:
+                h_prior += self.cross_entropy(self.class_count_dictionary[k]['Percent'])
+            information_gain = h_prior - remainder
+            feature_results.update({i: information_gain})
 
-            loss_score = 0
-            feature_results.update({i: loss_score})
+        return max(feature_results, key=feature_results.get)
+
+    def cross_entropy(self, q):
+        if q == 0 or q == 1:
+            return 0
+        else:
+            return (-1 * q) * np.log2(q)
+
 
 if __name__ == "__main__":
 
