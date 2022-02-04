@@ -11,6 +11,7 @@ class Node:
             is_root = None,
             is_leaf = None,
             parent = None,
+            feature_cat = None,
             depth = None,
             max_depth = None,
             min_samples = None
@@ -21,15 +22,18 @@ class Node:
         self.Y = Y
 
         # get node information
-        self.is_root = is_root if is_root else 'False'
-        self.is_leaf = is_leaf if is_leaf else 'False'
-        self.parent = parent if parent else 'None'
+        self.is_root = is_root if is_root else False
+        self.is_leaf = is_leaf if is_leaf else False
+        self.parent = parent if parent else None
+
+        # get feature information
+        self.feature_category = feature_cat if feature_cat else None
         self.best_feature = None
         self.children = []
 
         # stopping point information
-        self.max_depth = max_depth if max_depth else 5
         self.depth = depth if depth else 0
+        self.max_depth = max_depth if max_depth else 5
         self.min_split_samples = min_samples if min_samples else 20
 
         # get all classes
@@ -106,26 +110,28 @@ class Node:
                 # if only one class value remains, max depth is reached, or feature subset too small, create a leaf node
                 if (len(np.unique(feature_subsets_dict[i][self.Y_name]))==1) or (self.depth==self.max_depth) or (len(feature_subsets_dict[i])<self.min_split_samples):
                     new_nodes_dict.update({i: Node(
-                                                X = feature_subsets_dict[i].drop(columns=self.Y_name),
-                                                Y = feature_subsets_dict[i][self.Y_name],
-                                                is_leaf = 'True',
-                                                parent=self,
-                                                depth=self.depth + 1,
-                                                max_depth=self.max_depth,
-                                                min_samples=self.min_split_samples
-                                                )})
+                        X = feature_subsets_dict[i].drop(columns=self.Y_name),
+                        Y = feature_subsets_dict[i][self.Y_name],
+                        is_leaf = True,
+                        parent=self,
+                        feature_cat = i,
+                        depth=self.depth + 1,
+                        max_depth=self.max_depth,
+                        min_samples=self.min_split_samples
+                        )})
                     self.children.append(new_nodes_dict[i])                    
                 
                 # else, create a new decision node and continue recursive grow
                 else:
                     new_nodes_dict.update({i: Node(
-                                                X = feature_subsets_dict[i].drop(columns=self.Y_name),
-                                                Y = feature_subsets_dict[i][self.Y_name],
-                                                parent=self,
-                                                depth=self.depth + 1,
-                                                max_depth=self.max_depth,
-                                                min_samples=self.min_split_samples
-                                                )})
+                        X = feature_subsets_dict[i].drop(columns=self.Y_name),
+                        Y = feature_subsets_dict[i][self.Y_name],
+                        parent=self,
+                        feature_cat = i,
+                        depth=self.depth + 1,
+                        max_depth=self.max_depth,
+                        min_samples=self.min_split_samples
+                        )})
                     self.children.append(new_nodes_dict[i])  
                     new_nodes_dict[i].grow_tree()
 
@@ -151,4 +157,3 @@ if __name__ == "__main__":
 
     DT = DecisionTree()
     DT.build_tree(X_train, Y_train, max_depth=5, min_samples=4)
-    print()
