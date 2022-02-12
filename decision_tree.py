@@ -6,15 +6,16 @@ class Node:
     # class constructor
     def __init__(
             self,
-            X = None,
-            Y = None,
-            is_root = None,
-            is_leaf = None,
-            parent = None,
-            feature_cat = None,
-            depth = None,
-            max_depth = None,
-            min_samples = None
+            X = None, # X_train
+            Y = None, # Y_train
+            is_root = None, # Boolean for root node
+            is_leaf = None, # Boolean for leaf node
+            parent = None, # Pointer to parent node
+            feature_cat = None, # Feature category of node
+            depth = None, # Depth of current node
+            max_depth = None, # Max depth of tree
+            min_samples = None, # Min samples to split on
+            split = None, # Split method (Entropy, GINI, etc.)
             ):
 
         # get X and Y dataframes
@@ -31,10 +32,11 @@ class Node:
         self.best_feature = None
         self.children = []
 
-        # stopping point information
+        # stopping point/split information
         self.depth = depth if depth else 0
         self.max_depth = max_depth if max_depth else 5
         self.min_split_samples = min_samples if min_samples else 20
+        self.split_method = split if split else 'Cross-Entropy'
 
         # get all classes
         self.classes = np.unique(self.Y)
@@ -71,29 +73,62 @@ class Node:
                 
                 # calculate cardinality and summed remainder
                 subset_count_dictionary[j].update({'Total': len(subset_dictionary[j])})
-                cardinality = ( subset_count_dictionary[j]['Total'] / total_count )
-                sub_remainder = 0
+                category_cardinality = (subset_count_dictionary[j]['Total'] / total_count)
+
+                # get class probability list
+                class_probs = []
                 for k in self.classes:
                     subset_count_dictionary[j].update({k: len(subset_dictionary[j].loc[subset_dictionary[j][self.Y_name] == k])})
-                    sub_remainder += self.cross_entropy(subset_count_dictionary[j][k] / subset_count_dictionary[j]['Total'])
-                remainder += (cardinality * sub_remainder)
+                    class_probs.append(subset_count_dictionary[j][k] / subset_count_dictionary[j]['Total'])
+
+                if self.split_method == 'Cross-Entropy':
+                    remainder += category_cardinality * self.cross_entropy(class_probs)
+                elif self.split_method == 'GINI':
+                    remainder += category_cardinality * self.GINI_index(class_probs)
+                elif self.split_method == 'Misclassification':
+                    remainder += category_cardinality * self.misclassification(class_probs)
             
             # get information gain for each attribute
-            h_prior = 0
+            h_prior_list = []
             for k in self.classes:
-                h_prior += self.cross_entropy(self.class_count_dictionary[k]['Percent'])
+                h_prior_list.append(self.class_count_dictionary[k]['Percent'])
+            
+            if self.split_method == 'Cross-Entropy':
+                h_prior = self.cross_entropy(h_prior_list)
+            elif self.split_method == 'GINI':
+                h_prior = self.GINI_index(h_prior_list)
+            elif self.split_method == 'Misclassification':
+                h_prior = self.misclassification(h_prior_list)
+            
             information_gain = h_prior - remainder
             feature_results.update({i: information_gain})
 
         # return feature with the highest information gain
         self.best_feature = max(feature_results, key=feature_results.get)
 
-    # method for calculating cross-entropy value
-    def cross_entropy(self, q):
-        if q == 0 or q == 1:
-            return 0
-        else:
-            return (-1 * q) * np.log2(q)
+    # method to calculate cross-entropy
+    def cross_entropy(self, class_probs):
+        remainder = 0
+        for q in class_probs:
+            if q == 0 or q == 1:
+                remainder += 0
+            else:
+                remainder += (-1 * q) * np.log2(q)
+        return remainder
+
+    # method to calculate GINI index
+    def GINI_index(self, class_probs):
+        remainder = 0
+        for q in class_probs:
+            if q == 0 or q == 1:
+                remainder += 0
+            else:
+                remainder += q * (1 - q)
+        return remainder
+
+    # method to calculate misclassification rate
+    def misclassification(self, class_probs):
+        return 1 - max(class_probs)
 
     # method to build a decision tree with X/Y training sets
     def grow_tree(self):
@@ -143,9 +178,9 @@ class DecisionTree:
         self.root = None
     
     # method to build tree
-    def build_tree(self, X, Y, max_depth, min_samples): # add hyperparameters
+    def build_tree(self, X, Y, max_depth, min_samples, split_method): # add hyperparameters
         if self.root is None:
-            self.root = Node(is_root='True', X=X, Y=Y, max_depth=max_depth, min_samples=min_samples)
+            self.root = Node(is_root='True', X=X, Y=Y, max_depth=max_depth, min_samples=min_samples, split=split_method)
         self.root.grow_tree()
 
 
@@ -156,4 +191,4 @@ if __name__ == "__main__":
     Y_train = golf_data['PlayGolf']    
 
     DT = DecisionTree()
-    DT.build_tree(X_train, Y_train, max_depth=5, min_samples=4)
+    DT.build_tree(X_train, Y_train, max_depth=5, min_samples=4, split_method='Misclassification')
