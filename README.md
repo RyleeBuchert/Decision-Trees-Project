@@ -1,2 +1,2 @@
 # Decision-Trees-Project
-Class project for CS-5333, implementing decision trees and ensemble methods.
+Class project for CS-5333, implementing decision tree machine learning model.
